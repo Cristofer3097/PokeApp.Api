@@ -1,8 +1,8 @@
 {
   "version": 2,
-  "dgSpecHash": "WIy3xrbuQeI=",
+  "dgSpecHash": "Wh7jpQ3gcj4=",
   "success": true,
-  "projectFilePath": "C:\\Users\\Abel\\Documents\\Github\\PokeApp.Api\\PokeApp.csproj",
+  "projectFilePath": "C:\\Users\\Abel\\Documents\\Github\\PokeApp.Api\\PokeApp.Api.csproj",
   "expectedPackageFiles": [
     "C:\\Users\\Abel\\.nuget\\packages\\bouncycastle.cryptography\\2.5.1\\bouncycastle.cryptography.2.5.1.nupkg.sha512",
     "C:\\Users\\Abel\\.nuget\\packages\\closedxml\\0.105.0\\closedxml.0.105.0.nupkg.sha512",

@@ -1,26 +1,27 @@
+using PokeApp.Services;
 var builder = WebApplication.CreateBuilder(args);
 
-// Add services to the container.
-builder.Services.AddControllersWithViews();
+// Agrega los servicios para los controladores de la API
+builder.Services.AddControllers();
+builder.Services.AddMemoryCache(); // Registra el servicio de caché en memoria que usa tu PokeApiService.
+builder.Services.AddHttpClient<PokeApiService>();
 
+// Agrega la configuración de CORS
 builder.Services.AddCors(options =>
 {
-    options.AddPolicy("AllowMyFrontend",
-        builder =>
-        {
-            builder.WithOrigins("https://localhost:7001")
-                   .AllowAnyHeader()
-                   .AllowAnyMethod();
-        });
+    options.AddPolicy("AllowMyFrontend", policy =>
+    {
+        // Acepta peticiones de AMBAS URLs del frontend
+        policy.WithOrigins("https://localhost:7175", "http://localhost:5089")
+              .AllowAnyHeader()
+              .AllowAnyMethod();
+    });
 });
 var app = builder.Build();
 
-// Configure the HTTP request pipeline.
-if (!app.Environment.IsDevelopment())
+if (app.Environment.IsDevelopment())
 {
-    app.UseExceptionHandler("/Home/Error");
-    // The default HSTS value is 30 days. You may want to change this for production scenarios, see https://aka.ms/aspnetcore-hsts.
-    app.UseHsts();
+    app.UseDeveloperExceptionPage();
 }
 
 app.UseHttpsRedirection();
@@ -28,12 +29,7 @@ app.UseRouting();
 app.UseCors("AllowMyFrontend");
 app.UseAuthorization();
 
-app.MapStaticAssets();
 
-app.MapControllerRoute(
-    name: "default",
-    pattern: "{controller=Home}/{action=Index}/{id?}")
-    .WithStaticAssets();
-
+app.MapControllers();
 
 app.Run();

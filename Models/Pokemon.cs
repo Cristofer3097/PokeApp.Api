@@ -2,6 +2,23 @@ using Newtonsoft.Json;
 
 namespace PokeApp.Models
 {
+    public class EmailRequest
+    {
+        // Datos básicos del correo
+        public string? EmailAddress { get; set; }
+        public string? Subject { get; set; }
+        public string? Body { get; set; }
+
+        // Datos opcionales para enviar detalles de un Pokémon
+        public string? PokemonName { get; set; }
+        public int PokemonId { get; set; }
+        public string? PokemonTypes { get; set; }
+        public string? PokemonImage { get; set; }
+
+        // Datos opcionales para adjuntar la lista filtrada
+        public string? NameFilter { get; set; }
+        public string? SpeciesFilter { get; set; }
+    }
     public class Pokemon
     {
         public int Id { get; set; }

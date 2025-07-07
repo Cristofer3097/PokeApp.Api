@@ -1,0 +1,96 @@
+[
+  {
+    "ContainingType": "PokemonApiController",
+    "Method": "GetPokemons",
+    "RelativePath": "api/pokemon",
+    "HttpMethod": "GET",
+    "IsController": true,
+    "Order": 0,
+    "Parameters": [
+      {
+        "Name": "nameFilter",
+        "Type": "System.String",
+        "IsRequired": false
+      },
+      {
+        "Name": "speciesFilter",
+        "Type": "System.String",
+        "IsRequired": false
+      },
+      {
+        "Name": "page",
+        "Type": "System.Int32",
+        "IsRequired": false
+      },
+      {
+        "Name": "limit",
+        "Type": "System.Int32",
+        "IsRequired": false
+      }
+    ],
+    "ReturnTypes": []
+  },
+  {
+    "ContainingType": "PokemonApiController",
+    "Method": "GetPokemonDetails",
+    "RelativePath": "api/pokemon/{name}",
+    "HttpMethod": "GET",
+    "IsController": true,
+    "Order": 0,
+    "Parameters": [
+      {
+        "Name": "name",
+        "Type": "System.String",
+        "IsRequired": true
+      }
+    ],
+    "ReturnTypes": []
+  },
+  {
+    "ContainingType": "PokemonApiController",
+    "Method": "ExportToExcel",
+    "RelativePath": "api/pokemon/export",
+    "HttpMethod": "GET",
+    "IsController": true,
+    "Order": 0,
+    "Parameters": [
+      {
+        "Name": "nameFilter",
+        "Type": "System.String",
+        "IsRequired": false
+      },
+      {
+        "Name": "speciesFilter",
+        "Type": "System.String",
+        "IsRequired": false
+      }
+    ],
+    "ReturnTypes": []
+  },
+  {
+    "ContainingType": "PokemonApiController",
+    "Method": "SendEmail",
+    "RelativePath": "api/pokemon/send-email",
+    "HttpMethod": "POST",
+    "IsController": true,
+    "Order": 0,
+    "Parameters": [
+      {
+        "Name": "request",
+        "Type": "PokeApp.Models.EmailRequest",
+        "IsRequired": true
+      }
+    ],
+    "ReturnTypes": []
+  },
+  {
+    "ContainingType": "PokemonApiController",
+    "Method": "GetPokemonTypes",
+    "RelativePath": "api/pokemon/types",
+    "HttpMethod": "GET",
+    "IsController": true,
+    "Order": 0,
+    "Parameters": [],
+    "ReturnTypes": []
+  }
+]

@@ -594,9 +594,9 @@
   "project": {
     "version": "1.0.0",
     "restore": {
-      "projectUniqueName": "C:\\Users\\Abel\\Documents\\Github\\PokeApp.Api\\PokeApp.csproj",
-      "projectName": "PokeApp",
-      "projectPath": "C:\\Users\\Abel\\Documents\\Github\\PokeApp.Api\\PokeApp.csproj",
+      "projectUniqueName": "C:\\Users\\Abel\\Documents\\Github\\PokeApp.Api\\PokeApp.Api.csproj",
+      "projectName": "PokeApp.Api",
+      "projectPath": "C:\\Users\\Abel\\Documents\\Github\\PokeApp.Api\\PokeApp.Api.csproj",
       "packagesPath": "C:\\Users\\Abel\\.nuget\\packages\\",
       "outputPath": "C:\\Users\\Abel\\Documents\\Github\\PokeApp.Api\\obj\\",
       "projectStyle": "PackageReference",

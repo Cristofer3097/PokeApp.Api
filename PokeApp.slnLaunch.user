@@ -1,0 +1,15 @@
+[
+  {
+    "Name": "Nuevo perfil",
+    "Projects": [
+      {
+        "Path": "PokeApp.csproj",
+        "Action": "Start"
+      },
+      {
+        "Path": "..\\PokeApp.Ui\\PokeApp.Ui.csproj",
+        "Action": "Start"
+      }
+    ]
+  }
+]

@@ -44,20 +44,37 @@ namespace PokeApp.Services
 
         public async Task<Pokemon?> GetPokemonDetails(string nameOrId)
         {
+            // Clave única para guardar este Pokémon en caché
+            string cacheKey = $"PokemonDetails_{nameOrId}";
+
+            // 1. Intenta obtener el Pokémon desde la memoria caché
+            if (_cache.TryGetValue(cacheKey, out Pokemon? pokemon))
+            {
+                return pokemon; // Si lo encuentra, lo devuelve inmediatamente
+            }
+
+            // 2. Si no está en caché, hace la llamada a la API
             try
             {
                 var response = await _httpClient.GetAsync($"{BaseUrl}pokemon/{nameOrId}/");
-                response.EnsureSuccessStatusCode(); // Lanza HttpRequestException para códigos de error HTTP
+                response.EnsureSuccessStatusCode();
                 var content = await response.Content.ReadAsStringAsync();
-                return JsonConvert.DeserializeObject<Pokemon>(content);
+                pokemon = JsonConvert.DeserializeObject<Pokemon>(content);
+
+                // 3. Guarda el resultado en caché para la próxima vez (por 10 minutos)
+                if (pokemon != null)
+                {
+                    _cache.Set(cacheKey, pokemon, TimeSpan.FromMinutes(10));
+                }
+                return pokemon;
             }
             catch (HttpRequestException)
             {
-                return null; // Devuelve null si falla la llamada HTTP (ej. 404)
+                return null;
             }
             catch (JsonException)
             {
-                return null; // Devuelve null si falla la deserialización
+                return null;
             }
         }
 
