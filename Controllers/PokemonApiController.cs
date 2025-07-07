@@ -25,42 +25,55 @@ public class PokemonApiController : ControllerBase
     [FromQuery] int page = 1,
     [FromQuery] int limit = 20)
     {
-        // 1. Obtiene la lista COMPLETA de nombres para poder filtrar
         var allPokemonsResponse = await _pokeApiService.GetPokemons(2000, 0);
         var pokemonListItems = allPokemonsResponse?.Results ?? new List<PokemonListItem>();
 
-
-        // 2. Filtra por nombre primero (es más eficiente)
+        // 1. Filtrar por nombre desde la lista básica
         if (!string.IsNullOrEmpty(nameFilter))
         {
-            pokemonListItems = pokemonListItems.Where(p => p.Name.Contains(nameFilter, StringComparison.OrdinalIgnoreCase)).ToList();
+            pokemonListItems = pokemonListItems
+                .Where(p => p.Name.Contains(nameFilter, StringComparison.OrdinalIgnoreCase))
+                .ToList();
         }
 
-        // 3. Obtiene los detalles COMPLETOS solo de los Pokémon que pasaron el primer filtro
-        var detailTasks = pokemonListItems
-        .Select(p => _pokeApiService.GetPokemonDetails(p.Name))
-        .ToList();
-        var allDetails = await Task.WhenAll(detailTasks);
-        var detailedPokemons = allDetails.Where(p => p != null).ToList();
-
-        // 4. Filtra por especie sobre la lista ya detallada
+        // 2. Obtener las primeras especies desde el nombre
         if (!string.IsNullOrEmpty(speciesFilter) && speciesFilter.ToLower() != "all")
         {
-            detailedPokemons = detailedPokemons.Where(p =>
-                p.Types.Any(t => t.Type.Name.Equals(speciesFilter, StringComparison.OrdinalIgnoreCase))
-            ).ToList();
+            // Obtener detalles mínimos necesarios (sólo para filtrado)
+            var speciesFiltered = new List<PokemonListItem>();
+            var tasks = pokemonListItems.Select(async item =>
+            {
+                var details = await _pokeApiService.GetPokemonDetails(item.Name);
+                if (details != null &&
+                    details.Types.Any(t => t.Type.Name.Equals(speciesFilter, StringComparison.OrdinalIgnoreCase)))
+                {
+                    lock (speciesFiltered)
+                        speciesFiltered.Add(item);
+                }
+            });
+
+            await Task.WhenAll(tasks);
+            pokemonListItems = speciesFiltered;
         }
 
-        // 5. Aplica la paginación AL FINAL, sobre la lista ya filtrada
-        var totalFilteredPokemons = detailedPokemons.Count;
-        var pagedPokemons = detailedPokemons.Skip((page - 1) * limit).Take(limit).ToList();
+        // 3. Paginación sobre lista filtrada
+        var totalFiltered = pokemonListItems.Count;
+        var pagedItems = pokemonListItems.Skip((page - 1) * limit).Take(limit).ToList();
+
+        // 4. Obtener detalles SOLO de los paginados
+        var detailTasks = pagedItems
+            .Select(p => _pokeApiService.GetPokemonDetails(p.Name))
+            .ToList();
+
+        var details = await Task.WhenAll(detailTasks);
+        var finalDetails = details.Where(p => p != null).ToList();
 
         var result = new
         {
-            count = totalFilteredPokemons,
-            totalPages = (int)Math.Ceiling((double)totalFilteredPokemons / limit),
+            count = totalFiltered,
+            totalPages = (int)Math.Ceiling((double)totalFiltered / limit),
             currentPage = page,
-            results = pagedPokemons
+            results = finalDetails
         };
 
         return Ok(result);
@@ -112,55 +125,91 @@ public class PokemonApiController : ControllerBase
     [HttpGet("export")]
     public async Task<IActionResult> ExportToExcel([FromQuery] string? nameFilter, [FromQuery] string? speciesFilter)
     {
-        // La lógica para Exportar a Excel
         try
         {
-            var pokemonsResponse = await _pokeApiService.GetPokemons(2000, 0);
-            var pokemonList = pokemonsResponse?.Results ?? new List<PokemonListItem>();
+            var allResponse = await _pokeApiService.GetPokemons(2000, 0);
+            var baseList = allResponse?.Results ?? new List<PokemonListItem>();
 
+            // 1. Filtro por nombre
             if (!string.IsNullOrEmpty(nameFilter))
             {
-                pokemonList = pokemonList.Where(p => p.Name.Contains(nameFilter, StringComparison.OrdinalIgnoreCase)).ToList();
+                baseList = baseList
+                    .Where(p => p.Name.Contains(nameFilter, StringComparison.OrdinalIgnoreCase))
+                    .ToList();
             }
 
+            // 2. Filtro por especie (si aplica), evitando cargar detalles de 2000 pokémon
+            if (!string.IsNullOrEmpty(speciesFilter) && speciesFilter.ToLower() != "all")
+            {
+                var filteredBySpecies = new List<PokemonListItem>();
+                var throttler = new SemaphoreSlim(5); // Máximo 5 hilos concurrentes
+                var tasks = baseList.Select(async item =>
+                {
+                    await throttler.WaitAsync();
+                    try
+                    {
+                        var details = await _pokeApiService.GetPokemonDetails(item.Name);
+                        if (details != null &&
+                            details.Types.Any(t => t.Type.Name.Equals(speciesFilter, StringComparison.OrdinalIgnoreCase)))
+                        {
+                            lock (filteredBySpecies) filteredBySpecies.Add(item);
+                        }
+                    }
+                    finally
+                    {
+                        throttler.Release();
+                    }
+                });
+
+                await Task.WhenAll(tasks);
+                baseList = filteredBySpecies;
+            }
+
+            // 3. Cargar detalles de los filtrados (con concurrencia limitada)
             var pokemonsToExport = new List<Pokemon>();
-            foreach (var item in pokemonList)
+            var throttled = new SemaphoreSlim(5);
+            var detailTasks = baseList.Select(async item =>
             {
-                var pokemonDetails = await _pokeApiService.GetPokemonDetails(item.Name);
-                if (pokemonDetails != null)
+                await throttled.WaitAsync();
+                try
                 {
-                    pokemonsToExport.Add(pokemonDetails);
+                    var details = await _pokeApiService.GetPokemonDetails(item.Name);
+                    if (details != null)
+                    {
+                        lock (pokemonsToExport) pokemonsToExport.Add(details);
+                    }
                 }
+                finally
+                {
+                    throttled.Release();
+                }
+            });
+
+            await Task.WhenAll(detailTasks);
+
+            using var workbook = new XLWorkbook();
+            var worksheet = workbook.Worksheets.Add("Pokémon");
+
+            worksheet.Cell(1, 1).Value = "ID";
+            worksheet.Cell(1, 2).Value = "Nombre";
+            worksheet.Cell(1, 3).Value = "Especie";
+
+            int row = 2;
+            foreach (var p in pokemonsToExport)
+            {
+                worksheet.Cell(row, 1).Value = p.Id;
+                worksheet.Cell(row, 2).Value = p.Name;
+                worksheet.Cell(row, 3).Value = string.Join(", ", p.Types.Select(t => t.Type.Name));
+                row++;
             }
 
-            if (!string.IsNullOrEmpty(speciesFilter) && speciesFilter != "all")
-            {
-                pokemonsToExport = pokemonsToExport.Where(p => p.Types.Any(t => t.Type.Name.Equals(speciesFilter, StringComparison.OrdinalIgnoreCase))).ToList();
-            }
+            using var stream = new MemoryStream();
+            workbook.SaveAs(stream);
+            var content = stream.ToArray();
 
-            using (var workbook = new ClosedXML.Excel.XLWorkbook())
-            {
-                var worksheet = workbook.Worksheets.Add("Pokémon");
-                worksheet.Cell(1, 1).Value = "ID";
-                worksheet.Cell(1, 2).Value = "Nombre";
-                worksheet.Cell(1, 3).Value = "Especie";
-
-                int row = 2;
-                foreach (var pokemon in pokemonsToExport)
-                {
-                    worksheet.Cell(row, 1).Value = pokemon.Id;
-                    worksheet.Cell(row, 2).Value = pokemon.Name;
-                    worksheet.Cell(row, 3).Value = string.Join(", ", pokemon.Types.Select(t => t.Type.Name));
-                    row++;
-                }
-
-                using (var stream = new System.IO.MemoryStream())
-                {
-                    workbook.SaveAs(stream);
-                    var content = stream.ToArray();
-                    return File(content, "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", "Pokemons.xlsx");
-                }
-            }
+            return File(content,
+                "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                "Pokemons.xlsx");
         }
         catch (Exception ex)
         {

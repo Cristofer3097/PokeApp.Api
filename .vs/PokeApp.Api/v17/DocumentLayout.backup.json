@@ -3,6 +3,12 @@
   "WorkspaceRootPath": "C:\\Users\\Abel\\Documents\\Github\\PokeApp.Api\\",
   "Documents": [
     {
+      "AbsoluteMoniker": "D:0:0:{A2FE74E1-B743-11D0-AE1A-00A0C90FFFC3}|\u003CMiscFiles\u003E|C:\\Users\\Abel\\Documents\\Github\\PokeApp.Ui\\appsettings.json||{90A6B3A7-C1A3-4009-A288-E2FF89E96FA0}"
+    },
+    {
+      "AbsoluteMoniker": "D:0:0:{A2FE74E1-B743-11D0-AE1A-00A0C90FFFC3}|\u003CMiscFiles\u003E|C:\\Users\\Abel\\Documents\\Github\\PokeApp.Ui\\appsettings.Development.json||{90A6B3A7-C1A3-4009-A288-E2FF89E96FA0}"
+    },
+    {
       "AbsoluteMoniker": "D:0:0:{A2FE74E1-B743-11D0-AE1A-00A0C90FFFC3}|\u003CMiscFiles\u003E|C:\\Users\\Abel\\Documents\\Github\\PokeApp.Api\\Program.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
       "RelativeMoniker": "D:0:0:{A2FE74E1-B743-11D0-AE1A-00A0C90FFFC3}|\u003CMiscFiles\u003E|solutionrelative:Program.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
     },
@@ -23,6 +29,32 @@
             {
               "$type": "Document",
               "DocumentIndex": 0,
+              "Title": "appsettings.json",
+              "DocumentMoniker": "C:\\Users\\Abel\\Documents\\Github\\PokeApp.Ui\\appsettings.json",
+              "RelativeDocumentMoniker": "..\\PokeApp.Ui\\appsettings.json",
+              "ToolTip": "C:\\Users\\Abel\\Documents\\Github\\PokeApp.Ui\\appsettings.json",
+              "RelativeToolTip": "..\\PokeApp.Ui\\appsettings.json",
+              "ViewState": "AgIAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA==",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.001642|",
+              "WhenOpened": "2025-07-07T14:56:28.47Z",
+              "EditorCaption": ""
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 1,
+              "Title": "appsettings.Development.json",
+              "DocumentMoniker": "C:\\Users\\Abel\\Documents\\Github\\PokeApp.Ui\\appsettings.Development.json",
+              "RelativeDocumentMoniker": "..\\PokeApp.Ui\\appsettings.Development.json",
+              "ToolTip": "C:\\Users\\Abel\\Documents\\Github\\PokeApp.Ui\\appsettings.Development.json",
+              "RelativeToolTip": "..\\PokeApp.Ui\\appsettings.Development.json",
+              "ViewState": "AgIAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA==",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.001642|",
+              "WhenOpened": "2025-07-07T14:56:28.149Z",
+              "EditorCaption": ""
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 2,
               "Title": "Program.cs",
               "DocumentMoniker": "C:\\Users\\Abel\\Documents\\Github\\PokeApp.Api\\Program.cs",
               "RelativeDocumentMoniker": "Program.cs",
@@ -35,7 +67,7 @@
             },
             {
               "$type": "Document",
-              "DocumentIndex": 1,
+              "DocumentIndex": 3,
               "Title": "PokemonApiController.cs",
               "DocumentMoniker": "C:\\Users\\Abel\\Documents\\Github\\PokeApp.Api\\Controllers\\PokemonApiController.cs",
               "RelativeDocumentMoniker": "Controllers\\PokemonApiController.cs",
