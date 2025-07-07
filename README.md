@@ -1,4 +1,4 @@
-Backend de la aplicación PokeApp, desarrollado en ASP.NET Core 8. Actúa como una capa de servicio que consume la API pública (pokeapi.co), procesa los datos y los expone a través de una API RESTful propia.
+Backend de la aplicación PokeApp, desarrollado en ASP.NET Core 8. Usando la API  pokeapi.
 
 Funcionalidades Principales:
 -Endpoints RESTful para listar, detallar y filtrar Pokémon.
