@@ -1,5 +1,5 @@
 using Newtonsoft.Json;
-
+using System.Collections.Generic;
 namespace PokeApp.Models
 {
     public class EmailRequest
@@ -22,16 +22,34 @@ namespace PokeApp.Models
     public class Pokemon
     {
         public int Id { get; set; }
-        public string Name { get; set; } = string.Empty; // Inicializa con string.Empty
-        public Sprite? Sprites { get; set; } // Puede ser nulo
-        public List<PokemonType> Types { get; set; } = new List<PokemonType>(); // Inicializa con lista vacía
-    }
+        public string Name { get; set; } = string.Empty;
+        public PokemonSprites Sprites { get; set; } = new PokemonSprites(); // Cambiado a PokemonSprites
+        public List<PokemonType> Types { get; set; } = new List<PokemonType>();
 
-    public class Sprite
+
+    }
+    public class PokemonSprites
     {
         [JsonProperty("front_default")]
-        public string? FrontDefault { get; set; } // Puede ser nulo
+        public string? FrontDefault { get; set; }
+
+        // Añadimos la propiedad 'Other' que contiene las imágenes de alta calidad
+        [JsonProperty("other")]
+        public OtherSprites? Other { get; set; }
     }
+
+    public class OtherSprites
+    {
+        [JsonProperty("official-artwork")]
+        public OfficialArtwork? OfficialArtwork { get; set; }
+    }
+
+    public class OfficialArtwork
+    {
+        [JsonProperty("front_default")]
+        public string? FrontDefault { get; set; }
+    }
+
 
     public class PokemonType
     {

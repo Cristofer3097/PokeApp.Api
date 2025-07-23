@@ -1,35 +1,48 @@
+
 using PokeApp.Services;
+
 var builder = WebApplication.CreateBuilder(args);
 
-// Agrega los servicios para los controladores de la API
-builder.Services.AddControllers();
-builder.Services.AddMemoryCache(); // Registra el servicio de caché en memoria que usa tu PokeApiService.
-builder.Services.AddHttpClient<PokeApiService>();
+// --- CONFIGURACIÓN DE SERVICIOS ---
 
-// Agrega la configuración de CORS
+// 1. Añade la política de CORS
+var uiAppUrl = "https://localhost:7175";
 builder.Services.AddCors(options =>
 {
-    options.AddPolicy("AllowMyFrontend", policy =>
-    {
-        // Acepta peticiones de AMBAS URLs del frontend
-        policy.WithOrigins("https://localhost:7175", "http://localhost:5089")
-              .AllowAnyHeader()
-              .AllowAnyMethod();
-    });
+    options.AddDefaultPolicy(
+        policy =>
+        {
+            policy.WithOrigins(uiAppUrl)
+                  .AllowAnyHeader()
+                  .AllowAnyMethod();
+        });
 });
+
+builder.Services.AddControllers()
+    .AddNewtonsoftJson(); 
+
+builder.Services.AddMemoryCache();
+
+builder.Services.AddHttpClient<PokeApiService>();
+builder.Services.AddScoped<PokeApiService>();
+
+builder.Services.AddEndpointsApiExplorer();
+builder.Services.AddSwaggerGen();
+
+
+// --- CONSTRUCCIÓN Y CONFIGURACIÓN DE LA APLICACIÓN ---
+
 var app = builder.Build();
 
 if (app.Environment.IsDevelopment())
 {
-    app.UseDeveloperExceptionPage();
+    app.UseSwagger();
+    app.UseSwaggerUI();
 }
 
 app.UseHttpsRedirection();
-app.UseRouting();
-app.UseCors("AllowMyFrontend");
+app.UseCors();
 app.UseAuthorization();
-
-
 app.MapControllers();
 
 app.Run();

@@ -25,55 +25,64 @@ public class PokemonApiController : ControllerBase
     [FromQuery] int page = 1,
     [FromQuery] int limit = 20)
     {
+        // 1. Obtenemos la lista completa de TODOS los pokémon (solo nombres y URLs)
         var allPokemonsResponse = await _pokeApiService.GetPokemons(2000, 0);
-        var pokemonListItems = allPokemonsResponse?.Results ?? new List<PokemonListItem>();
+        IEnumerable<PokemonListItem> pokemonListItems = allPokemonsResponse?.Results ?? new List<PokemonListItem>();
 
-        // 1. Filtrar por nombre desde la lista básica
+        // 2. Filtramos la lista por nombre si es necesario
         if (!string.IsNullOrEmpty(nameFilter))
         {
             pokemonListItems = pokemonListItems
-                .Where(p => p.Name.Contains(nameFilter, StringComparison.OrdinalIgnoreCase))
-                .ToList();
+                .Where(p => p.Name.Contains(nameFilter, StringComparison.OrdinalIgnoreCase));
         }
 
-        // 2. Obtener las primeras especies desde el nombre
+        // 3. Filtramos por especie (tipo) si es necesario
         if (!string.IsNullOrEmpty(speciesFilter) && speciesFilter.ToLower() != "all")
         {
-            // Obtener detalles mínimos necesarios (sólo para filtrado)
-            var speciesFiltered = new List<PokemonListItem>();
+            var filteredBySpecies = new List<PokemonListItem>();
+            // Usamos un SemaphoreSlim para limitar la concurrencia y no sobrecargar la API
+            var throttler = new SemaphoreSlim(10);
             var tasks = pokemonListItems.Select(async item =>
             {
-                var details = await _pokeApiService.GetPokemonDetails(item.Name);
-                if (details != null &&
-                    details.Types.Any(t => t.Type.Name.Equals(speciesFilter, StringComparison.OrdinalIgnoreCase)))
+                await throttler.WaitAsync();
+                try
                 {
-                    lock (speciesFiltered)
-                        speciesFiltered.Add(item);
+                    var details = await _pokeApiService.GetPokemonDetails(item.Name);
+                    if (details != null && details.Types.Any(t => t.Type.Name.Equals(speciesFilter, StringComparison.OrdinalIgnoreCase)))
+                    {
+                        lock (filteredBySpecies)
+                        {
+                            filteredBySpecies.Add(item);
+                        }
+                    }
+                }
+                finally
+                {
+                    throttler.Release();
                 }
             });
-
             await Task.WhenAll(tasks);
-            pokemonListItems = speciesFiltered;
+            pokemonListItems = filteredBySpecies;
         }
 
-        // 3. Paginación sobre lista filtrada
-        var totalFiltered = pokemonListItems.Count;
-        var pagedItems = pokemonListItems.Skip((page - 1) * limit).Take(limit).ToList();
+        var filteredList = pokemonListItems.ToList();
+        var totalFiltered = filteredList.Count;
 
-        // 4. Obtener detalles SOLO de los paginados
-        var detailTasks = pagedItems
-            .Select(p => _pokeApiService.GetPokemonDetails(p.Name))
-            .ToList();
+        // 4. Aplicamos paginación a la lista ya filtrada
+        var pagedItems = filteredList.Skip((page - 1) * limit).Take(limit).ToList();
 
-        var details = await Task.WhenAll(detailTasks);
-        var finalDetails = details.Where(p => p != null).ToList();
+        // 5. Obtenemos los detalles COMPLETOS solo de los Pokémon de la página actual
+        var detailTasks = pagedItems.Select(p => _pokeApiService.GetPokemonDetails(p.Name));
+
+        // Corregimos la doble llamada. Ahora se ejecuta una sola vez.
+        var fullDetailsOfPagedPokemons = (await Task.WhenAll(detailTasks)).Where(p => p != null).ToList();
 
         var result = new
         {
             count = totalFiltered,
             totalPages = (int)Math.Ceiling((double)totalFiltered / limit),
             currentPage = page,
-            results = finalDetails
+            results = fullDetailsOfPagedPokemons // Enviamos los detalles completos
         };
 
         return Ok(result);
@@ -91,37 +100,33 @@ public class PokemonApiController : ControllerBase
 
     // GET: api/pokemon
     [HttpGet("{name}")]
-    public async Task<IActionResult> GetPokemonDetails(string name)
+public async Task<IActionResult> GetPokemonDetails(string name)
+{
+    var details = await _pokeApiService.GetPokemonDetails(name);
+    if (details == null)
     {
-        // Obtener detalles básicos
-        var details = await _pokeApiService.GetPokemonDetails(name);
-        if (details == null)
-        {
-            return NotFound();
-        }
-
-        // Obtener detalles de la especie para la descripción
-        var species = await _pokeApiService.GetPokemonSpecies(name);
-
-        // Buscar la descripción en español o inglés
-        var description = species?.FlavorTextEntries?
-                                  .FirstOrDefault(f => f.Language?.Name == "es")?.FlavorText ??
-                          species?.FlavorTextEntries?
-                                  .FirstOrDefault(f => f.Language?.Name == "en")?.FlavorText ??
-                          "Descripción no disponible.";
-
-        // Objeto anónimo para combinar toda la información y enviarla como JSON
-        var result = new
-        {
-            id = details.Id,
-            name = details.Name,
-            sprites = details.Sprites,
-            types = details.Types,
-            description = description.Replace("\n", " ").Replace("\f", " ") // Limpiamos saltos de línea
-        };
-
-        return Ok(result);
+        return NotFound();
     }
+
+    var species = await _pokeApiService.GetPokemonSpecies(name);
+    var description = species?.FlavorTextEntries?
+                              .FirstOrDefault(f => f.Language?.Name == "es")?.FlavorText ??
+                      species?.FlavorTextEntries?
+                              .FirstOrDefault(f => f.Language?.Name == "en")?.FlavorText ??
+                      "Descripción no disponible.";
+
+    // Creamos un objeto anónimo para la respuesta, esto es clave.
+    var result = new
+    {
+        id = details.Id,
+        name = details.Name,
+        sprites = details.Sprites, // Pasamos el objeto de sprites intacto
+        types = details.Types,
+        description = description.Replace("\n", " ").Replace("\f", " ")
+    };
+
+    return Ok(result);
+}
     [HttpGet("export")]
     public async Task<IActionResult> ExportToExcel([FromQuery] string? nameFilter, [FromQuery] string? speciesFilter)
     {

@@ -1,3 +1,0 @@
-﻿<Project>
-  <Import Project="..\build\PokeApp.Api.props" />
-</Project>
