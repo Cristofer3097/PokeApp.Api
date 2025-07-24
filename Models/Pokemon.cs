@@ -26,6 +26,7 @@ namespace PokeApp.Models
         public PokemonSprites Sprites { get; set; } = new PokemonSprites(); // Cambiado a PokemonSprites
         public List<PokemonType> Types { get; set; } = new List<PokemonType>();
 
+        public string? Description { get; set; }
 
     }
     public class PokemonSprites
@@ -68,6 +69,7 @@ namespace PokeApp.Models
         public string? Next { get; set; } // Puede ser nulo
         public string? Previous { get; set; } // Puede ser nulo
         public List<PokemonListItem> Results { get; set; } = new List<PokemonListItem>(); // Inicializa
+
     }
 
     public class PokemonListItem
@@ -79,10 +81,11 @@ namespace PokeApp.Models
     public class PokemonSpecies
     {
         public int Id { get; set; }
-        public string Name { get; set; } = string.Empty; // Inicializa
-        public List<FlavorTextEntry> FlavorTextEntries { get; set; } = new List<FlavorTextEntry>(); // Inicializa
-    }
+        public string Name { get; set; } = string.Empty;
 
+        [JsonProperty("flavor_text_entries")]
+        public List<FlavorTextEntry> FlavorTextEntries { get; set; } = new List<FlavorTextEntry>();
+    }
     public class FlavorTextEntry
     {
         [JsonProperty("flavor_text")]
