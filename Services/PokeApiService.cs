@@ -141,5 +141,32 @@ namespace PokeApp.Services
                 return new List<TypeInfo>(); // Devuelve una lista vacía en caso de error de deserialización
             }
         }
+
+        public async Task<GenerationResponse?> GetGeneration(int generationNumber)
+        {
+            string cacheKey = $"Generation_{generationNumber}";
+            if (_cache.TryGetValue(cacheKey, out GenerationResponse? generation))
+            {
+                return generation;
+            }
+
+            try
+            {
+                var response = await _httpClient.GetAsync($"{BaseUrl}generation/{generationNumber}");
+                response.EnsureSuccessStatusCode();
+                var content = await response.Content.ReadAsStringAsync();
+                generation = JsonConvert.DeserializeObject<GenerationResponse>(content);
+
+                if (generation != null)
+                {
+                    _cache.Set(cacheKey, generation, TimeSpan.FromHours(1));
+                }
+                return generation;
+            }
+            catch (Exception)
+            {
+                return null;
+            }
+        }
     }
 }

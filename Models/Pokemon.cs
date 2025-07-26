@@ -122,4 +122,16 @@ namespace PokeApp.Models
     {
         public string Name { get; set; } = string.Empty; // Inicializa
     }
+
+    public class GenerationResponse
+    {
+        [JsonProperty("pokemon_species")]
+        public List<PokemonSpeciesSummary> PokemonSpecies { get; set; } = new List<PokemonSpeciesSummary>();
+    }
+
+    public class PokemonSpeciesSummary
+    {
+        public string Name { get; set; } = string.Empty;
+        public string Url { get; set; } = string.Empty;
+    }
 }

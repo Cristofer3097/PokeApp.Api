@@ -19,8 +19,9 @@ public class PokemonApiController : ControllerBase
         _pokeApiService = pokeApiService;
         _configuration = configuration; // Asignar
     }
+
     [HttpGet]
-public async Task<IActionResult> GetPokemons(
+    public async Task<IActionResult> GetPokemons(
     [FromQuery] string? nameFilter,
     [FromQuery] string? speciesFilter,
     [FromQuery] int page = 1,
@@ -325,5 +326,49 @@ public async Task<IActionResult> GetPokemons(
             // Devolvemos un error 500 con el mensaje para depuración
             return StatusCode(500, new { message = $"Error al enviar el correo: {ex.Message}" });
         }
+    }
+
+    [HttpGet("generation/{generationNumber}")]
+    public async Task<IActionResult> GetPokemonsByGeneration(int generationNumber)
+    {
+        var generationData = await _pokeApiService.GetGeneration(generationNumber);
+        if (generationData == null)
+        {
+            return NotFound($"No se encontró la generación {generationNumber}.");
+        }
+
+        // Usamos un SemaphoreSlim para limitar la concurrencia y no sobrecargar la API
+        var throttler = new SemaphoreSlim(10);
+        var detailTasks = generationData.PokemonSpecies.Select(async species =>
+        {
+            await throttler.WaitAsync();
+            try
+            {
+                var details = await _pokeApiService.GetPokemonDetails(species.Name);
+                if (details != null)
+                {
+                    var speciesDetails = await _pokeApiService.GetPokemonSpecies(species.Name);
+                    var description = speciesDetails?.FlavorTextEntries
+                                              .FirstOrDefault(f => f.Language?.Name == "es")?.FlavorText ??
+                                      speciesDetails?.FlavorTextEntries
+                                              .FirstOrDefault(f => f.Language?.Name == "en")?.FlavorText ??
+                                      "Descripción no disponible.";
+                    details.Description = description.Replace("\n", " ").Replace("\f", " ");
+                }
+                return details;
+            }
+            finally
+            {
+                throttler.Release();
+            }
+        });
+
+        // Esperamos a que todas las tareas terminen y filtramos los nulos
+        var pokemonsWithDetails = (await Task.WhenAll(detailTasks))
+                                    .Where(p => p != null)
+                                    .OrderBy(p => p.Id) // Ordenamos por ID de Pokémon
+                                    .ToList();
+
+        return Ok(pokemonsWithDetails);
     }
 }
