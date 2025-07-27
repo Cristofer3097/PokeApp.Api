@@ -5,6 +5,7 @@ using MimeKit;
 using MailKit.Net.Smtp;
 using ClosedXML.Excel;
 using Newtonsoft.Json;
+using DocumentFormat.OpenXml.Office2016.Drawing.ChartDrawing;
 
 
 [ApiController]
@@ -106,9 +107,6 @@ public class PokemonApiController : ControllerBase
 
         var species = await _pokeApiService.GetPokemonSpecies(name);
 
-        // DEBUG: imprime JSON
-        Console.WriteLine(JsonConvert.SerializeObject(species));
-
         var descriptionEntry = species?.FlavorTextEntries?
             .FirstOrDefault(f => f.Language?.Name?.ToLower() == "es" && !string.IsNullOrWhiteSpace(f.FlavorText))
             ?? species?.FlavorTextEntries?
@@ -122,17 +120,12 @@ public class PokemonApiController : ControllerBase
             .Trim()
             ?? "Descripción no disponible.";
 
-        var result = new
-        {
-            id = details.Id,
-            name = details.Name,
-            sprites = details.Sprites,
-            types = details.Types,
-            description = description
-        };
+      
+        details.Description = description;
 
-        return Ok(result);
+        return Ok(details);
     }
+
     [HttpGet("export")]
     public async Task<IActionResult> ExportToExcel([FromQuery] string? nameFilter, [FromQuery] string? speciesFilter)
     {
@@ -354,6 +347,7 @@ public class PokemonApiController : ControllerBase
                                               .FirstOrDefault(f => f.Language?.Name == "en")?.FlavorText ??
                                       "Descripción no disponible.";
                     details.Description = description.Replace("\n", " ").Replace("\f", " ");
+
                 }
                 return details;
             }
@@ -371,4 +365,49 @@ public class PokemonApiController : ControllerBase
 
         return Ok(pokemonsWithDetails);
     }
+
+    [HttpGet("evolution-chain/{pokemonId}")]
+    public async Task<IActionResult> GetEvolutionChain(int pokemonId)
+    {
+        // 1. Obtenemos la especie del Pokémon para encontrar la URL de su cadena evolutiva
+        var species = await _pokeApiService.GetPokemonSpecies(pokemonId.ToString());
+        if (string.IsNullOrEmpty(species?.EvolutionChain?.Url))
+        {
+            return Ok(new List<EvolutionStep>()); // Devuelve una lista vacía si no hay cadena
+        }
+
+        // 2. Obtenemos la cadena de evolución completa desde su URL
+        var evolutionChain = await _pokeApiService.GetEvolutionChain(species.EvolutionChain.Url);
+        if (evolutionChain?.Chain == null)
+        {
+            return Ok(new List<EvolutionStep>());
+        }
+
+        var evolutionSteps = new List<EvolutionStep>();
+        var currentLink = evolutionChain.Chain;
+
+        // 3. Recorremos la cadena de evolución de forma recursiva
+        while (currentLink != null && currentLink.Species != null)
+        {
+            var pokemonDetails = await _pokeApiService.GetPokemonDetails(currentLink.Species.Name);
+            if (pokemonDetails != null)
+            {
+                // El primer Pokémon no tiene detalles de cómo evolucionó, así que es null
+                EvolutionDetail? evolutionDetailForThisStage = currentLink.EvolutionDetails.FirstOrDefault();
+
+                evolutionSteps.Add(new EvolutionStep
+                {
+                    Pokemon = pokemonDetails,
+                    EvolutionDetail = evolutionDetailForThisStage
+                });
+            }
+
+            // Pasamos al siguiente eslabón de la cadena
+            currentLink = currentLink.EvolvesTo.FirstOrDefault();
+        }
+
+        return Ok(evolutionSteps);
+    }
+
+
 }

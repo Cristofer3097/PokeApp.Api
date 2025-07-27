@@ -48,6 +48,22 @@
   },
   {
     "ContainingType": "PokemonApiController",
+    "Method": "GetEvolutionChain",
+    "RelativePath": "api/pokemon/evolution-chain/{pokemonId}",
+    "HttpMethod": "GET",
+    "IsController": true,
+    "Order": 0,
+    "Parameters": [
+      {
+        "Name": "pokemonId",
+        "Type": "System.Int32",
+        "IsRequired": true
+      }
+    ],
+    "ReturnTypes": []
+  },
+  {
+    "ContainingType": "PokemonApiController",
     "Method": "ExportToExcel",
     "RelativePath": "api/pokemon/export",
     "HttpMethod": "GET",
@@ -62,16 +78,6 @@
       {
         "Name": "speciesFilter",
         "Type": "System.String",
-        "IsRequired": false
-      },
-      {
-        "Name": "page",
-        "Type": "System.Int32",
-        "IsRequired": false
-      },
-      {
-        "Name": "limit",
-        "Type": "System.Int32",
         "IsRequired": false
       }
     ],

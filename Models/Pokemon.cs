@@ -22,21 +22,36 @@ namespace PokeApp.Models
     //Obtencion de datos pokemon
     public class Pokemon
     {
+        [JsonProperty("id")]
         public int Id { get; set; }
+        [JsonProperty("name")]
         public string Name { get; set; } = string.Empty;
-        public PokemonSprites Sprites { get; set; } = new PokemonSprites(); 
+        [JsonProperty("sprites")]
+        public PokemonSprites Sprites { get; set; } = new PokemonSprites();
+        [JsonProperty("types")]
         public List<PokemonType> Types { get; set; } = new List<PokemonType>();
-
-        public string? Description { get; set; }
-        public int Height { get; set; } 
+        [JsonProperty("stats")]
+        public List<Stat> Stats { get; set; } = new List<Stat>();
+        [JsonProperty("height")]
+        public int Height { get; set; }
+        [JsonProperty("weight")]
         public int Weight { get; set; }
+        public string? Description { get; set; }
     }
     public class PokemonSprites
     {
         [JsonProperty("front_default")]
         public string? FrontDefault { get; set; }
 
-        // Añadimos la propiedad 'Other' que contiene las imágenes de alta calidad
+        [JsonProperty("front_female")]
+        public string? FrontFemale { get; set; }
+
+        [JsonProperty("front_shiny")]
+        public string? FrontShiny { get; set; }
+
+        [JsonProperty("front_shiny_female")]
+        public string? FrontShinyFemale { get; set; }
+
         [JsonProperty("other")]
         public OtherSprites? Other { get; set; }
 
@@ -110,6 +125,14 @@ namespace PokeApp.Models
 
         [JsonProperty("flavor_text_entries")]
         public List<FlavorTextEntry> FlavorTextEntries { get; set; } = new List<FlavorTextEntry>();
+
+        [JsonProperty("evolution_chain")]
+        public EvolutionChainUrl? EvolutionChain { get; set; }
+    }
+
+    public class EvolutionChainUrl
+    {
+        public string Url { get; set; } = string.Empty;
     }
     public class FlavorTextEntry
     {
@@ -133,5 +156,65 @@ namespace PokeApp.Models
     {
         public string Name { get; set; } = string.Empty;
         public string Url { get; set; } = string.Empty;
+    }
+
+    // --- Clases para STATS ---
+    public class Stat
+    {
+        [JsonProperty("base_stat")]
+        public int BaseStat { get; set; }
+
+        [JsonProperty("effort")]
+        public int Effort { get; set; }
+
+        [JsonProperty("stat")] 
+        public StatInfo? StatInfo { get; set; }
+    }
+    public class StatInfo
+    {
+        [JsonProperty("name")]
+        public string Name { get; set; } = string.Empty;
+    }
+    // --- Clases para EVOLUCIONES ---
+    public class EvolutionChainResponse
+    {
+        public ChainLink? Chain { get; set; }
+    }
+    public class EvolutionStep
+    {
+        public Pokemon ?Pokemon { get; set; }    // El Pokémon en esta etapa
+        public EvolutionDetail? EvolutionDetail { get; set; } // Cómo se evoluciona desde el anterior (puede ser null para el primero)
+    }
+
+    public class ChainLink
+    {
+        public PokemonSpeciesSummary? Species { get; set; }
+
+        [JsonProperty("evolves_to")]
+        public List<ChainLink> EvolvesTo { get; set; } = new List<ChainLink>();
+
+        [JsonProperty("evolution_details")]
+        public List<EvolutionDetail> EvolutionDetails { get; set; } = new List<EvolutionDetail>();
+    }
+
+    public class EvolutionDetail
+    {
+        [JsonProperty("min_level")]
+        public int? MinLevel { get; set; }
+
+        public Item? Item { get; set; }
+
+        [JsonProperty("trigger")]
+        public Trigger? Trigger { get; set; }
+    }
+
+    public class Item
+    {
+        public string Name { get; set; } = string.Empty;
+    }
+
+    public class Trigger
+    {
+        public string Name { get; set; } = string.Empty;
     }
 }

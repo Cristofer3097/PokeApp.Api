@@ -168,5 +168,35 @@ namespace PokeApp.Services
                 return null;
             }
         }
+
+        public async Task<EvolutionChainResponse?> GetEvolutionChain(string evolutionChainUrl)
+        {
+            string cacheKey = $"EvolutionChain_{evolutionChainUrl}";
+            if (_cache.TryGetValue(cacheKey, out EvolutionChainResponse? evolution))
+            {
+                return evolution;
+            }
+
+            try
+            {
+                // La PokeAPI nos da una URL completa, así que la usamos directamente
+                var response = await _httpClient.GetAsync(evolutionChainUrl);
+                response.EnsureSuccessStatusCode();
+                var content = await response.Content.ReadAsStringAsync();
+                evolution = JsonConvert.DeserializeObject<EvolutionChainResponse>(content);
+
+                if (evolution != null)
+                {
+                    _cache.Set(cacheKey, evolution, TimeSpan.FromHours(1));
+                }
+                return evolution;
+            }
+            catch (Exception)
+            {
+                return null;
+            }
+        }
+
+
     }
 }

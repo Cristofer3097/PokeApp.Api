@@ -104,24 +104,6 @@
             "schema": {
               "type": "string"
             }
-          },
-          {
-            "name": "page",
-            "in": "query",
-            "schema": {
-              "type": "integer",
-              "format": "int32",
-              "default": 1
-            }
-          },
-          {
-            "name": "limit",
-            "in": "query",
-            "schema": {
-              "type": "integer",
-              "format": "int32",
-              "default": 20
-            }
           }
         ],
         "responses": {
@@ -175,6 +157,29 @@
         "parameters": [
           {
             "name": "generationNumber",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int32"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      }
+    },
+    "/api/pokemon/evolution-chain/{pokemonId}": {
+      "get": {
+        "tags": [
+          "PokemonApi"
+        ],
+        "parameters": [
+          {
+            "name": "pokemonId",
             "in": "path",
             "required": true,
             "schema": {
