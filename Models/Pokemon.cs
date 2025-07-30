@@ -202,6 +202,9 @@ namespace PokeApp.Models
         [JsonProperty("min_level")]
         public int? MinLevel { get; set; }
 
+        [JsonProperty("min_happiness")]
+        public int? MinHappiness { get; set; }
+
         public Item? Item { get; set; }
 
         [JsonProperty("trigger")]
