@@ -37,6 +37,12 @@ namespace PokeApp.Models
         [JsonProperty("weight")]
         public int Weight { get; set; }
         public string? Description { get; set; }
+
+        [JsonProperty("abilities")]
+        public List<PokemonAbility> Abilities { get; set; } = new List<PokemonAbility>();
+
+        public List<EggGroup> EggGroups { get; set; } = new List<EggGroup>();
+
     }
     public class PokemonSprites
     {
@@ -128,6 +134,9 @@ namespace PokeApp.Models
 
         [JsonProperty("evolution_chain")]
         public EvolutionChainUrl? EvolutionChain { get; set; }
+
+        [JsonProperty("egg_groups")]
+        public List<EggGroup> EggGroups { get; set; } = new List<EggGroup>();
     }
 
     public class EvolutionChainUrl
@@ -217,6 +226,41 @@ namespace PokeApp.Models
     }
 
     public class Trigger
+    {
+        public string Name { get; set; } = string.Empty;
+    }
+
+    // --- Clases para HABILIDADES ---
+    public class PokemonAbility
+    {
+        [JsonProperty("ability")]
+        public AbilityInfo? Ability { get; set; }
+
+        [JsonProperty("is_hidden")]
+        public bool IsHidden { get; set; }
+    }
+
+    public class AbilityInfo
+    {
+        public string Name { get; set; } = string.Empty;
+    }
+
+    // --- Clases para el DETALLE de una habilidad ---
+    public class AbilityDetail
+    {
+        public string Name { get; set; } = string.Empty;
+
+        [JsonProperty("flavor_text_entries")]
+        public List<AbilityFlavorTextEntry> FlavorTextEntries { get; set; } = new List<AbilityFlavorTextEntry>();
+    }
+
+    public class AbilityFlavorTextEntry
+    {
+        [JsonProperty("flavor_text")]
+        public string FlavorText { get; set; } = string.Empty;
+        public Language? Language { get; set; }
+    }
+    public class EggGroup
     {
         public string Name { get; set; } = string.Empty;
     }

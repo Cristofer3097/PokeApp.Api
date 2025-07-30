@@ -48,6 +48,22 @@
   },
   {
     "ContainingType": "PokemonApiController",
+    "Method": "GetAbility",
+    "RelativePath": "api/pokemon/ability/{name}",
+    "HttpMethod": "GET",
+    "IsController": true,
+    "Order": 0,
+    "Parameters": [
+      {
+        "Name": "name",
+        "Type": "System.String",
+        "IsRequired": true
+      }
+    ],
+    "ReturnTypes": []
+  },
+  {
+    "ContainingType": "PokemonApiController",
     "Method": "GetEvolutionChain",
     "RelativePath": "api/pokemon/evolution-chain/{pokemonId}",
     "HttpMethod": "GET",

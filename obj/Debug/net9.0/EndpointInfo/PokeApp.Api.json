@@ -194,6 +194,28 @@
           }
         }
       }
+    },
+    "/api/pokemon/ability/{name}": {
+      "get": {
+        "tags": [
+          "PokemonApi"
+        ],
+        "parameters": [
+          {
+            "name": "name",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      }
     }
   },
   "components": {

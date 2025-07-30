@@ -197,6 +197,31 @@ namespace PokeApp.Services
             }
         }
 
+        public async Task<AbilityDetail?> GetAbilityDetails(string name)
+        {
+            string cacheKey = $"Ability_{name}";
+            if (_cache.TryGetValue(cacheKey, out AbilityDetail? ability))
+            {
+                return ability;
+            }
 
+            try
+            {
+                var response = await _httpClient.GetAsync($"{BaseUrl}ability/{name}");
+                response.EnsureSuccessStatusCode();
+                var content = await response.Content.ReadAsStringAsync();
+                ability = JsonConvert.DeserializeObject<AbilityDetail>(content);
+
+                if (ability != null)
+                {
+                    _cache.Set(cacheKey, ability, TimeSpan.FromHours(1));
+                }
+                return ability;
+            }
+            catch (Exception)
+            {
+                return null;
+            }
+        }
     }
 }

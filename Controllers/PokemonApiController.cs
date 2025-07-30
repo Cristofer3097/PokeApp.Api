@@ -330,7 +330,6 @@ public class PokemonApiController : ControllerBase
             return NotFound($"No se encontró la generación {generationNumber}.");
         }
 
-        // Usamos un SemaphoreSlim para limitar la concurrencia y no sobrecargar la API
         var throttler = new SemaphoreSlim(10);
         var detailTasks = generationData.PokemonSpecies.Select(async species =>
         {
@@ -346,10 +345,23 @@ public class PokemonApiController : ControllerBase
                                       speciesDetails?.FlavorTextEntries
                                               .FirstOrDefault(f => f.Language?.Name == "en")?.FlavorText ??
                                       "Descripción no disponible.";
-                    details.Description = description.Replace("\n", " ").Replace("\f", " ");
 
+                    // Creamos un nuevo objeto para asegurar que todas las propiedades se incluyan
+                    return new Pokemon
+                    {
+                        Id = details.Id,
+                        Name = details.Name,
+                        Sprites = details.Sprites,
+                        Types = details.Types,
+                        Height = details.Height,
+                        Weight = details.Weight,
+                        Stats = details.Stats,
+                        Abilities = details.Abilities, // <-- Aseguramos que las habilidades se incluyan
+                        Description = description.Replace("\n", " ").Replace("\f", " "),
+                        EggGroups = speciesDetails.EggGroups
+                    };
                 }
-                return details;
+                return null;
             }
             finally
             {
@@ -357,14 +369,14 @@ public class PokemonApiController : ControllerBase
             }
         });
 
-        // Esperamos a que todas las tareas terminen y filtramos los nulos
         var pokemonsWithDetails = (await Task.WhenAll(detailTasks))
                                     .Where(p => p != null)
-                                    .OrderBy(p => p.Id) // Ordenamos por ID de Pokémon
+                                    .OrderBy(p => p.Id)
                                     .ToList();
 
         return Ok(pokemonsWithDetails);
     }
+
 
     [HttpGet("evolution-chain/{pokemonId}")]
     public async Task<IActionResult> GetEvolutionChain(int pokemonId)
@@ -408,6 +420,23 @@ public class PokemonApiController : ControllerBase
 
         return Ok(evolutionSteps);
     }
+    [HttpGet("ability/{name}")]
+    public async Task<IActionResult> GetAbility(string name)
+    {
+        var abilityDetails = await _pokeApiService.GetAbilityDetails(name);
+        if (abilityDetails == null)
+        {
+            return NotFound("Habilidad no encontrada.");
+        }
 
+        // Buscamos la descripción en español o inglés
+        var description = abilityDetails.FlavorTextEntries
+                            .FirstOrDefault(f => f.Language?.Name == "es")?.FlavorText
+                          ?? abilityDetails.FlavorTextEntries
+                            .FirstOrDefault(f => f.Language?.Name == "en")?.FlavorText
+                          ?? "Descripción no disponible.";
+
+        return Ok(new { name = abilityDetails.Name, description = description.Replace("\n", " ") });
+    }
 
 }
