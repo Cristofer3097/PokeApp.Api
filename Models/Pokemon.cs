@@ -264,4 +264,9 @@ namespace PokeApp.Models
     {
         public string Name { get; set; } = string.Empty;
     }
+    public class GenerationResult
+    {
+        public int TotalCount { get; set; }
+        public List<Pokemon> Pokemons { get; set; } = new List<Pokemon>();
+    }
 }

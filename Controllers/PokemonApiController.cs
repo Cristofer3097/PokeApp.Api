@@ -322,16 +322,31 @@ public class PokemonApiController : ControllerBase
     }
 
     [HttpGet("generation/{generationNumber}")]
-    public async Task<IActionResult> GetPokemonsByGeneration(int generationNumber)
+    public async Task<IActionResult> GetPokemonsByGeneration(int generationNumber, [FromQuery] int limit = 40, [FromQuery] int offset = 0)
     {
+        // 1. Obtenemos la lista COMPLETA de especies de la generación
         var generationData = await _pokeApiService.GetGeneration(generationNumber);
         if (generationData == null)
         {
             return NotFound($"No se encontró la generación {generationNumber}.");
         }
 
+        var allSpeciesInGeneration = generationData.PokemonSpecies
+            .OrderBy(s => {
+                // Extraemos el ID de la URL para ordenar correctamente
+                var parts = s.Url.TrimEnd('/').Split('/');
+                return int.TryParse(parts.LastOrDefault(), out var id) ? id : int.MaxValue;
+            })
+            .ToList();
+
+        var totalCount = allSpeciesInGeneration.Count;
+
+        // 2. Aplicamos el 'limit' y 'offset' a la LISTA DE ESPECIES, no a los detalles
+        var speciesForThisPage = allSpeciesInGeneration.Skip(offset).Take(limit).ToList();
+
+        // 3. Obtenemos los detalles SÓLO para el lote actual de Pokémon
         var throttler = new SemaphoreSlim(10);
-        var detailTasks = generationData.PokemonSpecies.Select(async species =>
+        var detailTasks = speciesForThisPage.Select(async species =>
         {
             await throttler.WaitAsync();
             try
@@ -340,28 +355,12 @@ public class PokemonApiController : ControllerBase
                 if (details != null)
                 {
                     var speciesDetails = await _pokeApiService.GetPokemonSpecies(species.Name);
-                    var description = speciesDetails?.FlavorTextEntries
-                                              .FirstOrDefault(f => f.Language?.Name == "es")?.FlavorText ??
-                                      speciesDetails?.FlavorTextEntries
-                                              .FirstOrDefault(f => f.Language?.Name == "en")?.FlavorText ??
-                                      "Descripción no disponible.";
-
-                    // Creamos un nuevo objeto para asegurar que todas las propiedades se incluyan
-                    return new Pokemon
-                    {
-                        Id = details.Id,
-                        Name = details.Name,
-                        Sprites = details.Sprites,
-                        Types = details.Types,
-                        Height = details.Height,
-                        Weight = details.Weight,
-                        Stats = details.Stats,
-                        Abilities = details.Abilities, // <-- Aseguramos que las habilidades se incluyan
-                        Description = description.Replace("\n", " ").Replace("\f", " "),
-                        EggGroups = speciesDetails.EggGroups
-                    };
+                    var description = speciesDetails?.FlavorTextEntries.FirstOrDefault(f => f.Language?.Name == "es")?.FlavorText ?? "Descripción no disponible.";
+                    details.Description = description.Replace("\n", " ").Replace("\f", " ");
+                    details.EggGroups = speciesDetails?.EggGroups ?? new List<EggGroup>();
+                    details.Abilities = details.Abilities ?? new List<PokemonAbility>();
                 }
-                return null;
+                return details;
             }
             finally
             {
@@ -369,12 +368,16 @@ public class PokemonApiController : ControllerBase
             }
         });
 
-        var pokemonsWithDetails = (await Task.WhenAll(detailTasks))
-                                    .Where(p => p != null)
-                                    .OrderBy(p => p.Id)
-                                    .ToList();
+        var pokemonsWithDetails = (await Task.WhenAll(detailTasks)).Where(p => p != null).ToList();
 
-        return Ok(pokemonsWithDetails);
+        // 4. Devolvemos el resultado paginado
+        var result = new GenerationResult
+        {
+            TotalCount = totalCount,
+            Pokemons = pokemonsWithDetails
+        };
+
+        return Ok(result);
     }
 
 
