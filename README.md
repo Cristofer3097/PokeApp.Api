@@ -12,4 +12,5 @@ Funcionalidades Principales:
 <img width="1858" height="952" alt="image" src="https://github.com/user-attachments/assets/be9ff2e3-ffd9-4950-a9ca-2f6d3fa9820c" />
 
 Pagina demostrativa: https://pokedex-retro.netlify.app
+
 Link del repositorio Frontend: https://github.com/Cristofer3097/PokeApp.Ui
