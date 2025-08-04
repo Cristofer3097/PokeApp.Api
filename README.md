@@ -1,5 +1,6 @@
-Backend de la aplicación PokeApp, desarrollado en ASP.NET Core 8. Usando la API  pokeapi.
+Pokedex desarrollado en ASP.NET. Usando la API  pokeapi.
 
+Backend de la aplicación PokeApp
 Funcionalidades Principales:
 -Endpoints RESTful para listar, detallar y filtrar Pokémon.
 -Lógica de negocio del lado del servidor, incluyendo filtrado por nombre y especie.
