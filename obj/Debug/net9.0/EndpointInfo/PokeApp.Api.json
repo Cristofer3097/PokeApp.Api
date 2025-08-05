@@ -269,6 +269,22 @@
             "type": "string",
             "nullable": true
           },
+          "pokemonDescription": {
+            "type": "string",
+            "nullable": true
+          },
+          "pokemonHeight": {
+            "type": "string",
+            "nullable": true
+          },
+          "pokemonWeight": {
+            "type": "string",
+            "nullable": true
+          },
+          "pokemonStats": {
+            "type": "string",
+            "nullable": true
+          },
           "nameFilter": {
             "type": "string",
             "nullable": true

@@ -223,5 +223,30 @@ namespace PokeApp.Services
                 return null;
             }
         }
+
+
+        public async Task<Pokemon?> GetPokemonWithFullDetails(string nameOrId)
+        {
+            // Primero, obtenemos los detalles básicos del Pokémon.
+            var pokemon = await GetPokemonDetails(nameOrId);
+            if (pokemon == null) return null;
+
+            // Luego, obtenemos los datos de la especie para enriquecer el objeto.
+            var species = await GetPokemonSpecies(nameOrId);
+            if (species != null)
+            {
+                var description = species.FlavorTextEntries
+                                         .FirstOrDefault(f => f.Language?.Name == "es")?.FlavorText ??
+                                  species.FlavorTextEntries
+                                         .FirstOrDefault(f => f.Language?.Name == "en")?.FlavorText ??
+                                  "Descripción no disponible.";
+
+                pokemon.Description = description.Replace("\n", " ").Replace("\f", " ");
+                pokemon.EggGroups = species.EggGroups ?? new List<EggGroup>();
+            }
+
+            return pokemon;
+        }
+
     }
 }

@@ -20,70 +20,107 @@ public class PokemonApiController : ControllerBase
         _pokeApiService = pokeApiService;
         _configuration = configuration; // Asignar
     }
-
-    [HttpGet]
-    public async Task<IActionResult> GetPokemons(
+    
+[HttpGet]
+public async Task<IActionResult> GetPokemons(
     [FromQuery] string? nameFilter,
     [FromQuery] string? speciesFilter,
     [FromQuery] int page = 1,
     [FromQuery] int limit = 20)
+{
+    // 1. Obtenemos la lista base de TODOS los pokémon (solo nombres y URLs)
+    var allPokemonsResponse = await _pokeApiService.GetPokemons(2000, 0);
+    IEnumerable<PokemonListItem> pokemonListItems = allPokemonsResponse?.Results ?? new List<PokemonListItem>();
+
+    // 2. Filtramos por nombre PRIMERO, ya que no requiere llamadas adicionales.
+    if (!string.IsNullOrEmpty(nameFilter))
     {
-        // 1. Obtenemos la lista completa de TODOS los pokémon
-        var allPokemonsResponse = await _pokeApiService.GetPokemons(2000, 0);
-        IEnumerable<PokemonListItem> pokemonListItems = allPokemonsResponse?.Results ?? new List<PokemonListItem>();
+        pokemonListItems = pokemonListItems
+            .Where(p => p.Name.Contains(nameFilter, StringComparison.OrdinalIgnoreCase));
+    }
 
-        // 2. Filtramos por nombre si es necesario
-        if (!string.IsNullOrEmpty(nameFilter))
+    var filteredList = pokemonListItems.ToList();
+    var pokemonsWithDetails = new List<Pokemon>();
+
+    // 3. Si hay filtro por especie, el proceso es más complejo y requiere detalles.
+    if (!string.IsNullOrEmpty(speciesFilter) && speciesFilter.ToLower() != "all")
+    {
+        var filteredBySpecies = new List<Pokemon>();
+        var throttler = new SemaphoreSlim(10); // Aumentamos la concurrencia segura
+
+        var tasks = filteredList.Select(async item =>
         {
-            pokemonListItems = pokemonListItems
-                .Where(p => p.Name.Contains(nameFilter, StringComparison.OrdinalIgnoreCase));
-        }
-
-        // (El filtro por especie se mantiene igual, pero lo aplicaremos después)
-        var filteredList = pokemonListItems.ToList();
-
-        // 3. Aplicamos paginación a la lista ya filtrada
-        var totalFiltered = filteredList.Count;
-        var pagedItems = filteredList.Skip((page - 1) * limit).Take(limit).ToList();
-
-        // 4. Obtenemos los detalles COMPLETOS (incluyendo descripción) solo para la página actual
-        var detailTasks = pagedItems.Select(async p =>
-        {
-            var details = await _pokeApiService.GetPokemonDetails(p.Name);
-            if (details != null)
+            await throttler.WaitAsync();
+            try
             {
-                var species = await _pokeApiService.GetPokemonSpecies(p.Name);
-                var description = species?.FlavorTextEntries
-                                          .FirstOrDefault(f => f.Language?.Name == "es")?.FlavorText ??
-                                  species?.FlavorTextEntries
-                                          .FirstOrDefault(f => f.Language?.Name == "en")?.FlavorText ??
-                                  "Descripción no disponible.";
-
-                details.Description = description.Replace("\n", " ").Replace("\f", " ");
+                // Obtenemos detalles SOLO para saber el tipo.
+                var details = await _pokeApiService.GetPokemonDetails(item.Name);
+                if (details != null &&
+                    details.Types.Any(t => t.Type.Name.Equals(speciesFilter, StringComparison.OrdinalIgnoreCase)))
+                {
+                    // Si coincide, lo agregamos a nuestra lista final.
+                    lock (filteredBySpecies)
+                    {
+                        filteredBySpecies.Add(details);
+                    }
+                }
             }
-            return details;
+            finally
+            {
+                throttler.Release();
+            }
         });
 
-        var fullDetailsOfPagedPokemons = (await Task.WhenAll(detailTasks)).Where(p => p != null).ToList();
+        await Task.WhenAll(tasks);
+        pokemonsWithDetails = filteredBySpecies;
+    }
+    // 4. Si NO hay filtro de especie, solo cargamos los detalles de la página actual.
+    else
+    {
+        var pagedItems = filteredList.Skip((page - 1) * limit).Take(limit).ToList();
+        var detailTasks = pagedItems.Select(p => _pokeApiService.GetPokemonDetails(p.Name));
+        pokemonsWithDetails = (await Task.WhenAll(detailTasks)).Where(p => p != null).ToList();
+    }
 
-        // 5. Si hay un filtro de especie, lo aplicamos ahora sobre los detalles completos
-        if (!string.IsNullOrEmpty(speciesFilter) && speciesFilter.ToLower() != "all")
+    // 5. Ahora enriquecemos los detalles que tenemos con la descripción.
+    //    Esto evita llamadas duplicadas a GetPokemonSpecies si ya las hicimos.
+    var enrichmentTasks = pokemonsWithDetails.Select(async p =>
+    {
+        // Solo busca la descripción si no la tiene ya.
+        if (string.IsNullOrEmpty(p.Description))
         {
-            fullDetailsOfPagedPokemons = fullDetailsOfPagedPokemons
-                .Where(p => p.Types.Any(t => t.Type.Name.Equals(speciesFilter, StringComparison.OrdinalIgnoreCase)))
-                .ToList();
+            var species = await _pokeApiService.GetPokemonSpecies(p.Name);
+            var description = species?.FlavorTextEntries
+                                      .FirstOrDefault(f => f.Language?.Name == "es")?.FlavorText ??
+                              species?.FlavorTextEntries
+                                      .FirstOrDefault(f => f.Language?.Name == "en")?.FlavorText ??
+                              "Descripción no disponible.";
+            p.Description = description.Replace("\n", " ").Replace("\f", " ");
         }
+        return p;
+    });
+
+    var finalDetailedPokemons = await Task.WhenAll(enrichmentTasks);
+
+    // 6. La paginación se aplica de forma diferente dependiendo de si filtramos por especie.
+    var totalFiltered = (string.IsNullOrEmpty(speciesFilter) || speciesFilter.ToLower() == "all")
+                        ? filteredList.Count
+                        : pokemonsWithDetails.Count;
+
+        var pagedResults = (string.IsNullOrEmpty(speciesFilter) || speciesFilter.ToLower() == "all")
+                            ? finalDetailedPokemons.ToList() 
+                            : finalDetailedPokemons.Skip((page - 1) * limit).Take(limit).ToList();
 
         var result = new
-        {
-            count = totalFiltered,
-            totalPages = (int)Math.Ceiling((double)totalFiltered / limit),
-            currentPage = page,
-            results = fullDetailsOfPagedPokemons
-        };
+    {
+        count = totalFiltered,
+        totalPages = (int)Math.Ceiling((double)totalFiltered / limit),
+        currentPage = page,
+        results = pagedResults
+    };
 
-        return Ok(result);
-    }
+    return Ok(result);
+}
 
     // MÉTODO PARA LLENAR EL DROPDOWN DE ESPECIES
     [HttpGet("types")]
@@ -129,96 +166,27 @@ public class PokemonApiController : ControllerBase
     [HttpGet("export")]
     public async Task<IActionResult> ExportToExcel([FromQuery] string? nameFilter, [FromQuery] string? speciesFilter)
     {
-        try
+        // Esta función auxiliar contendrá la lógica de filtrado optimizada y será reutilizable.
+        var pokemonsToExport = await GetFilteredPokemonList(nameFilter, speciesFilter);
+
+        using var workbook = new XLWorkbook();
+        var worksheet = workbook.Worksheets.Add("Pokémon");
+        worksheet.Cell(1, 1).Value = "ID";
+        worksheet.Cell(1, 2).Value = "Nombre";
+        worksheet.Cell(1, 3).Value = "Especie";
+        int row = 2;
+        foreach (var p in pokemonsToExport)
         {
-            var allResponse = await _pokeApiService.GetPokemons(2000, 0);
-            var baseList = allResponse?.Results ?? new List<PokemonListItem>();
-
-            // 1. Filtro por nombre
-            if (!string.IsNullOrEmpty(nameFilter))
-            {
-                baseList = baseList
-                    .Where(p => p.Name.Contains(nameFilter, StringComparison.OrdinalIgnoreCase))
-                    .ToList();
-            }
-
-            // 2. Filtro por especie (si aplica), evitando cargar detalles de 2000 pokémon
-            if (!string.IsNullOrEmpty(speciesFilter) && speciesFilter.ToLower() != "all")
-            {
-                var filteredBySpecies = new List<PokemonListItem>();
-                var throttler = new SemaphoreSlim(5); // Máximo 5 hilos concurrentes
-                var tasks = baseList.Select(async item =>
-                {
-                    await throttler.WaitAsync();
-                    try
-                    {
-                        var details = await _pokeApiService.GetPokemonDetails(item.Name);
-                        if (details != null &&
-                            details.Types.Any(t => t.Type.Name.Equals(speciesFilter, StringComparison.OrdinalIgnoreCase)))
-                        {
-                            lock (filteredBySpecies) filteredBySpecies.Add(item);
-                        }
-                    }
-                    finally
-                    {
-                        throttler.Release();
-                    }
-                });
-
-                await Task.WhenAll(tasks);
-                baseList = filteredBySpecies;
-            }
-
-            // 3. Cargar detalles de los filtrados (con concurrencia limitada)
-            var pokemonsToExport = new List<Pokemon>();
-            var throttled = new SemaphoreSlim(5);
-            var detailTasks = baseList.Select(async item =>
-            {
-                await throttled.WaitAsync();
-                try
-                {
-                    var details = await _pokeApiService.GetPokemonDetails(item.Name);
-                    if (details != null)
-                    {
-                        lock (pokemonsToExport) pokemonsToExport.Add(details);
-                    }
-                }
-                finally
-                {
-                    throttled.Release();
-                }
-            });
-
-            await Task.WhenAll(detailTasks);
-
-            using var workbook = new XLWorkbook();
-            var worksheet = workbook.Worksheets.Add("Pokémon");
-
-            worksheet.Cell(1, 1).Value = "ID";
-            worksheet.Cell(1, 2).Value = "Nombre";
-            worksheet.Cell(1, 3).Value = "Especie";
-
-            int row = 2;
-            foreach (var p in pokemonsToExport)
-            {
-                worksheet.Cell(row, 1).Value = p.Id;
-                worksheet.Cell(row, 2).Value = p.Name;
-                worksheet.Cell(row, 3).Value = string.Join(", ", p.Types.Select(t => t.Type.Name));
-                row++;
-            }
-
-            using var stream = new MemoryStream();
-            workbook.SaveAs(stream);
-            var content = stream.ToArray();
-
-            return File(content,
-                "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-                "Pokemons.xlsx");
+            worksheet.Cell(row, 1).Value = p.Id;
+            worksheet.Cell(row, 2).Value = p.Name;
+            worksheet.Cell(row, 3).Value = string.Join(", ", p.Types.Select(t => t.Type.Name));
+            row++;
         }
-        catch (Exception ex)
-        {
-            return StatusCode(500, $"Error al exportar a Excel: {ex.Message}");
-        }
+
+        using var stream = new MemoryStream();
+        workbook.SaveAs(stream);
+        var content = stream.ToArray();
+        return File(content, "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", "Pokemons.xlsx");
     }
     [HttpPost("send-email")] // Eviar a correo api/pokemon/send-email
     public async Task<IActionResult> SendEmail([FromBody] EmailRequest request)
@@ -246,38 +214,20 @@ public class PokemonApiController : ControllerBase
             if (!string.IsNullOrEmpty(request.PokemonName))
             {
                 builder.HtmlBody = $@"
-                <h1>Detalles de {request.PokemonName}</h1>
-                <img src='{request.PokemonImage}' alt='Imagen de {request.PokemonName}' width='150' />
-                <p><strong>ID:</strong> {request.PokemonId}</p>
-                <p><strong>Especie(s):</strong> {request.PokemonTypes}</p>
-                <hr>
-                <p>{request.Body}</p>";
+        <h1>Detalles de {request.PokemonName}</h1>
+        <img src='{request.PokemonImage}' alt='Imagen de {request.PokemonName}' width='150' />
+        <p><strong>ID:</strong> {request.PokemonId}</p>
+        <p><strong>Especie(s):</strong> {request.PokemonTypes}</p>
+        <hr>
+        <p>{request.Body}</p>";
             }
-            // Caso 2: Enviar la lista completa con un archivo Excel adjunto
+            // Caso 2: Adjuntar la lista filtrada
             else
             {
                 builder.HtmlBody = request.Body;
 
-                // La lógica para generar el Excel es la misma que para la exportación
-                var pokemonsResponse = await _pokeApiService.GetPokemons(2000, 0);
-                var pokemonList = pokemonsResponse?.Results ?? new List<PokemonListItem>();
-
-                if (!string.IsNullOrEmpty(request.NameFilter))
-                {
-                    pokemonList = pokemonList.Where(p => p.Name.Contains(request.NameFilter, StringComparison.OrdinalIgnoreCase)).ToList();
-                }
-
-                var pokemonsToExport = new List<Pokemon>();
-                foreach (var item in pokemonList)
-                {
-                    var pokemonDetails = await _pokeApiService.GetPokemonDetails(item.Name);
-                    if (pokemonDetails != null) pokemonsToExport.Add(pokemonDetails);
-                }
-
-                if (!string.IsNullOrEmpty(request.SpeciesFilter) && request.SpeciesFilter != "all")
-                {
-                    pokemonsToExport = pokemonsToExport.Where(p => p.Types.Any(t => t.Type.Name.Equals(request.SpeciesFilter, StringComparison.OrdinalIgnoreCase))).ToList();
-                }
+                // REUTILIZAMOS la lógica de filtrado optimizada.
+                var pokemonsToExport = await GetFilteredPokemonList(request.NameFilter, request.SpeciesFilter);
 
                 using (var workbook = new XLWorkbook())
                 {
@@ -321,10 +271,56 @@ public class PokemonApiController : ControllerBase
         }
     }
 
+    private async Task<List<Pokemon>> GetFilteredPokemonList(string? nameFilter, string? speciesFilter)
+    {
+        var allPokemonsResponse = await _pokeApiService.GetPokemons(2000, 0);
+        var pokemonListItems = allPokemonsResponse?.Results ?? new List<PokemonListItem>();
+
+        if (!string.IsNullOrEmpty(nameFilter))
+        {
+            pokemonListItems = pokemonListItems.Where(p => p.Name.Contains(nameFilter, StringComparison.OrdinalIgnoreCase)).ToList();
+        }
+
+        var pokemonsToProcess = new List<PokemonListItem>(pokemonListItems);
+        var detailedPokemons = new List<Pokemon>();
+        var throttler = new SemaphoreSlim(10); // Límite de concurrencia
+
+        var tasks = pokemonsToProcess.Select(async item =>
+        {
+            await throttler.WaitAsync();
+            try
+            {
+                var details = await _pokeApiService.GetPokemonDetails(item.Name);
+                if (details != null)
+                {
+                    // Si hay filtro de especie, verificamos si coincide.
+                    if (!string.IsNullOrEmpty(speciesFilter) && speciesFilter.ToLower() != "all")
+                    {
+                        if (details.Types.Any(t => t.Type.Name.Equals(speciesFilter, StringComparison.OrdinalIgnoreCase)))
+                        {
+                            lock (detailedPokemons) detailedPokemons.Add(details);
+                        }
+                    }
+                    // Si no hay filtro, simplemente lo añadimos.
+                    else
+                    {
+                        lock (detailedPokemons) detailedPokemons.Add(details);
+                    }
+                }
+            }
+            finally
+            {
+                throttler.Release();
+            }
+        });
+
+        await Task.WhenAll(tasks);
+        return detailedPokemons;
+    }
+
     [HttpGet("generation/{generationNumber}")]
     public async Task<IActionResult> GetPokemonsByGeneration(int generationNumber, [FromQuery] int limit = 40, [FromQuery] int offset = 0)
     {
-        // 1. Obtenemos la lista COMPLETA de especies de la generación
         var generationData = await _pokeApiService.GetGeneration(generationNumber);
         if (generationData == null)
         {
@@ -333,34 +329,23 @@ public class PokemonApiController : ControllerBase
 
         var allSpeciesInGeneration = generationData.PokemonSpecies
             .OrderBy(s => {
-                // Extraemos el ID de la URL para ordenar correctamente
                 var parts = s.Url.TrimEnd('/').Split('/');
                 return int.TryParse(parts.LastOrDefault(), out var id) ? id : int.MaxValue;
             })
             .ToList();
 
         var totalCount = allSpeciesInGeneration.Count;
-
-        // 2. Aplicamos el 'limit' y 'offset' a la LISTA DE ESPECIES, no a los detalles
         var speciesForThisPage = allSpeciesInGeneration.Skip(offset).Take(limit).ToList();
 
-        // 3. Obtenemos los detalles SÓLO para el lote actual de Pokémon
+        // ¡AHORA MUCHO MÁS LIMPIO!
         var throttler = new SemaphoreSlim(10);
         var detailTasks = speciesForThisPage.Select(async species =>
         {
             await throttler.WaitAsync();
             try
             {
-                var details = await _pokeApiService.GetPokemonDetails(species.Name);
-                if (details != null)
-                {
-                    var speciesDetails = await _pokeApiService.GetPokemonSpecies(species.Name);
-                    var description = speciesDetails?.FlavorTextEntries.FirstOrDefault(f => f.Language?.Name == "es")?.FlavorText ?? "Descripción no disponible.";
-                    details.Description = description.Replace("\n", " ").Replace("\f", " ");
-                    details.EggGroups = speciesDetails?.EggGroups ?? new List<EggGroup>();
-                    details.Abilities = details.Abilities ?? new List<PokemonAbility>();
-                }
-                return details;
+                // Usamos el nuevo método que obtiene TODO.
+                return await _pokeApiService.GetPokemonWithFullDetails(species.Name);
             }
             finally
             {
@@ -370,7 +355,6 @@ public class PokemonApiController : ControllerBase
 
         var pokemonsWithDetails = (await Task.WhenAll(detailTasks)).Where(p => p != null).ToList();
 
-        // 4. Devolvemos el resultado paginado
         var result = new GenerationResult
         {
             TotalCount = totalCount,
