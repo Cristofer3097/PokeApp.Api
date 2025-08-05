@@ -14,6 +14,10 @@ namespace PokeApp.Models
         public int PokemonId { get; set; }
         public string? PokemonTypes { get; set; }
         public string? PokemonImage { get; set; }
+        public string? PokemonDescription { get; set; }
+        public string? PokemonHeight { get; set; }
+        public string? PokemonWeight { get; set; }
+        public string? PokemonStats { get; set; }
 
         // Datos opcionales para adjuntar la lista filtrada
         public string? NameFilter { get; set; }
