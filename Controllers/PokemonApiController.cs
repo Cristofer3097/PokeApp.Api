@@ -368,45 +368,56 @@ public async Task<IActionResult> GetPokemons(
     [HttpGet("evolution-chain/{pokemonId}")]
     public async Task<IActionResult> GetEvolutionChain(int pokemonId)
     {
-        // 1. Obtenemos la especie del Pokémon para encontrar la URL de su cadena evolutiva
         var species = await _pokeApiService.GetPokemonSpecies(pokemonId.ToString());
         if (string.IsNullOrEmpty(species?.EvolutionChain?.Url))
         {
-            return Ok(new List<EvolutionStep>()); // Devuelve una lista vacía si no hay cadena
+            return Ok(new List<List<EvolutionStep>>()); // Devuelve lista de listas vacía
         }
 
-        // 2. Obtenemos la cadena de evolución completa desde su URL
         var evolutionChain = await _pokeApiService.GetEvolutionChain(species.EvolutionChain.Url);
         if (evolutionChain?.Chain == null)
         {
-            return Ok(new List<EvolutionStep>());
+            return Ok(new List<List<EvolutionStep>>());
         }
 
-        var evolutionSteps = new List<EvolutionStep>();
-        var currentLink = evolutionChain.Chain;
+        var allPaths = new List<List<EvolutionStep>>();
+        await ProcessChainRecursively(evolutionChain.Chain, new List<EvolutionStep>(), allPaths);
 
-        // 3. Recorremos la cadena de evolución de forma recursiva
-        while (currentLink != null && currentLink.Species != null)
-        {
-            var pokemonDetails = await _pokeApiService.GetPokemonDetails(currentLink.Species.Name);
-            if (pokemonDetails != null)
-            {
-                // El primer Pokémon no tiene detalles de cómo evolucionó, así que es null
-                EvolutionDetail? evolutionDetailForThisStage = currentLink.EvolutionDetails.FirstOrDefault();
-
-                evolutionSteps.Add(new EvolutionStep
-                {
-                    Pokemon = pokemonDetails,
-                    EvolutionDetail = evolutionDetailForThisStage
-                });
-            }
-
-            // Pasamos al siguiente eslabón de la cadena
-            currentLink = currentLink.EvolvesTo.FirstOrDefault();
-        }
-
-        return Ok(evolutionSteps);
+        return Ok(allPaths);
     }
+
+    // AÑADE este nuevo método privado al final de la clase
+    private async Task ProcessChainRecursively(ChainLink currentLink, List<EvolutionStep> currentPath, List<List<EvolutionStep>> allPaths)
+    {
+        if (currentLink?.Species == null) return;
+
+        var pokemonDetails = await _pokeApiService.GetPokemonDetails(currentLink.Species.Name);
+        if (pokemonDetails == null) return;
+
+        var step = new EvolutionStep
+        {
+            Pokemon = pokemonDetails,
+            EvolutionDetail = currentLink.EvolutionDetails.FirstOrDefault()
+        };
+
+        // Creamos una nueva lista para este camino para no modificar las otras ramas
+        var newPath = new List<EvolutionStep>(currentPath) { step };
+
+        // Si no hay más evoluciones, hemos completado un camino
+        if (currentLink.EvolvesTo == null || !currentLink.EvolvesTo.Any())
+        {
+            allPaths.Add(newPath);
+            return;
+        }
+
+        // Si hay más evoluciones, continuamos la recursión para cada una de ellas
+        foreach (var nextLink in currentLink.EvolvesTo)
+        {
+            // Pasamos el nuevo camino (newPath) a la siguiente llamada recursiva
+            await ProcessChainRecursively(nextLink, newPath, allPaths);
+        }
+    }
+
     [HttpGet("ability/{name}")]
     public async Task<IActionResult> GetAbility(string name)
     {
