@@ -173,9 +173,6 @@ namespace PokeApp.Models
         [JsonProperty("base_stat")]
         public int BaseStat { get; set; }
 
-        [JsonProperty("effort")]
-        public int Effort { get; set; }
-
         [JsonProperty("stat")] 
         public StatInfo? StatInfo { get; set; }
     }
@@ -269,4 +266,23 @@ namespace PokeApp.Models
         public int TotalCount { get; set; }
         public List<Pokemon> Pokemons { get; set; } = new List<Pokemon>();
     }
+
+    public class TypeDetailResponse
+    {
+        [JsonProperty("pokemon")]
+        public List<PokemonOfType> Pokemon { get; set; } = new List<PokemonOfType>();
+    }
+
+    public class PokemonOfType
+    {
+        [JsonProperty("pokemon")]
+        public PokemonNameUrlPair? PokemonInfo { get; set; }
+    }
+
+    public class PokemonNameUrlPair
+    {
+        [JsonProperty("name")]
+        public string Name { get; set; } = string.Empty;
+    }
 }
+

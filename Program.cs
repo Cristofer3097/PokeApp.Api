@@ -16,13 +16,6 @@ builder.Services.AddCors(options =>
                   .AllowAnyHeader()
                   .AllowAnyMethod();
         });
-    options.AddPolicy("AllowAll",
-      policy =>
-      {
-          policy.AllowAnyOrigin()
-                .AllowAnyHeader()
-                .AllowAnyMethod();
-      });
 });
 
 builder.Services.AddControllers()
@@ -46,7 +39,7 @@ if (app.Environment.IsDevelopment())
     app.UseSwagger();
     app.UseSwaggerUI();
 }
-app.UseCors("AllowAll");
+
 app.UseHttpsRedirection();
 app.UseCors();
 app.UseAuthorization();

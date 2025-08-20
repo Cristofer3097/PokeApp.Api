@@ -247,6 +247,30 @@ namespace PokeApp.Services
 
             return pokemon;
         }
+        public async Task<List<string>> GetPokemonNamesByType(string typeName)
+        {
+            string cacheKey = $"PokemonNamesByType_{typeName}";
+            if (_cache.TryGetValue(cacheKey, out List<string>? cachedNames))
+            {
+                return cachedNames ?? new List<string>();
+            }
 
+            try
+            {
+                var response = await _httpClient.GetAsync($"{BaseUrl}type/{typeName}");
+                response.EnsureSuccessStatusCode();
+                var content = await response.Content.ReadAsStringAsync();
+                var typeData = JsonConvert.DeserializeObject<TypeDetailResponse>(content);
+
+                var names = typeData?.Pokemon.Select(p => p.PokemonInfo?.Name ?? "").Where(n => !string.IsNullOrEmpty(n)).ToList() ?? new List<string>();
+
+                _cache.Set(cacheKey, names, TimeSpan.FromHours(1));
+                return names;
+            }
+            catch (Exception)
+            {
+                return new List<string>();
+            }
+        }
     }
 }
