@@ -273,40 +273,34 @@ public async Task<IActionResult> GetPokemons(
 
     private async Task<List<Pokemon>> GetFilteredPokemonList(string? nameFilter, string? speciesFilter)
     {
-        var allPokemonsResponse = await _pokeApiService.GetPokemons(2000, 0);
-        var pokemonListItems = allPokemonsResponse?.Results ?? new List<PokemonListItem>();
+        IEnumerable<string> pokemonNames;
 
-        if (!string.IsNullOrEmpty(nameFilter))
+        // Estrategia 1: Si hay filtro por especie, obtenemos esa lista primero. ¡MUCHO MÁS RÁPIDO!
+        if (!string.IsNullOrEmpty(speciesFilter) && speciesFilter.ToLower() != "all")
         {
-            pokemonListItems = pokemonListItems.Where(p => p.Name.Contains(nameFilter, StringComparison.OrdinalIgnoreCase)).ToList();
+            pokemonNames = await _pokeApiService.GetPokemonNamesByType(speciesFilter);
+        }
+        // Estrategia 2: Si no, obtenemos la lista completa de nombres.
+        else
+        {
+            var allPokemonsResponse = await _pokeApiService.GetPokemons(2000, 0);
+            pokemonNames = allPokemonsResponse?.Results.Select(p => p.Name) ?? new List<string>();
         }
 
-        var pokemonsToProcess = new List<PokemonListItem>(pokemonListItems);
-        var detailedPokemons = new List<Pokemon>();
-        var throttler = new SemaphoreSlim(10); // Límite de concurrencia
+        // Ahora, aplicamos el filtro por nombre sobre la lista de nombres que ya tenemos.
+        if (!string.IsNullOrEmpty(nameFilter))
+        {
+            pokemonNames = pokemonNames.Where(name => name.Contains(nameFilter, StringComparison.OrdinalIgnoreCase));
+        }
 
-        var tasks = pokemonsToProcess.Select(async item =>
+        // Finalmente, obtenemos los detalles SOLO de los Pokémon que pasaron todos los filtros.
+        var throttler = new SemaphoreSlim(10);
+        var tasks = pokemonNames.Select(async name =>
         {
             await throttler.WaitAsync();
             try
             {
-                var details = await _pokeApiService.GetPokemonDetails(item.Name);
-                if (details != null)
-                {
-                    // Si hay filtro de especie, verificamos si coincide.
-                    if (!string.IsNullOrEmpty(speciesFilter) && speciesFilter.ToLower() != "all")
-                    {
-                        if (details.Types.Any(t => t.Type.Name.Equals(speciesFilter, StringComparison.OrdinalIgnoreCase)))
-                        {
-                            lock (detailedPokemons) detailedPokemons.Add(details);
-                        }
-                    }
-                    // Si no hay filtro, simplemente lo añadimos.
-                    else
-                    {
-                        lock (detailedPokemons) detailedPokemons.Add(details);
-                    }
-                }
+                return await _pokeApiService.GetPokemonDetails(name);
             }
             finally
             {
@@ -314,7 +308,7 @@ public async Task<IActionResult> GetPokemons(
             }
         });
 
-        await Task.WhenAll(tasks);
+        var detailedPokemons = (await Task.WhenAll(tasks)).Where(p => p != null).ToList();
         return detailedPokemons;
     }
 
